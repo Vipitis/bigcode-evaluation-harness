@@ -130,7 +130,7 @@ class FunctionGeneration(Task): #task2
         super().__init__(
             # TODO: Specify the list of stop words in `stop_words` for the code generation task \
             # and if the evaluation requires executing the generated code in `requires_execution`.
-            stop_words=[], #new function starts... so all the keywords
+            stop_words=["\nfloat ", "\nvec", "\nint"], #new function starts... so all the keywords
             requires_execution=True, #we run shadercode - could that be harmful? (all in the metric)
         )
 
@@ -151,6 +151,8 @@ class FunctionGeneration(Task): #task2
             sample from the test dataset
         :return: str
         """
+
+        # alternatively, give the whole code up untill the function declaration ends? as in this paper: https://arxiv.org/abs/2306.03203
         return doc["model_ctx"]
 
     def get_reference(self, doc):
@@ -162,6 +164,31 @@ class FunctionGeneration(Task): #task2
         :return: str
         """
         return doc["full_code"] #returns full original code
+
+    def remove_last_block(self, code):
+        """
+        Adapted from https://github.com/bigcode-project/bigcode-evaluation-harness/blob/be2a44c2faa29c20b5041d7083acb698eb373309/bigcode_eval/tasks/humanevalpack.py#L275C5-L311C20
+        """
+        for w in self.stop_words:
+            if w in code:
+                code = code[:code.find(w)]
+
+        ### Find the first occassion where a chain of { } is closed??      
+        open_brackets = 1
+        cut = False
+        for i, c in enumerate(code):
+            if c == '{':
+                open_brackets += 1
+            elif c == '}':
+                open_brackets -= 1
+            if open_brackets == 0:
+                code = code[:i+1]
+                cut = True
+                break
+        if not cut:
+            if '}' in code:
+                code = code[:code.rfind('}')] + '}'
+        return code
 
     def postprocess_generation(self, generation, idx):
         # TODO: define the postprocessing for the LM generation
@@ -176,9 +203,15 @@ class FunctionGeneration(Task): #task2
         # TODO: trim generation to just the first function -> how do we get the parser in here?
         # from: https://huggingface.co/spaces/Vipitis/ShaderCoder/blob/main/utils/tree_utils.py#L45
         # generation = ShaderCoder.utils.parse_functions(generation)[0].text.decode() #not easily imported...
+        
+
+        # assemble into the full code with just the function replaced
         ref = self.dataset["test"][idx]
+        model_ctx = ref["model_ctx"]
         full_code = ref["full_code"]
         start, end = ref["func_range"]
+        gen = self.remove_last_block(generation[len(model_ctx):]) #remove last block to avoid syntax errors
+
         return full_code[:start] + generation + full_code[end:] #does this patch it together correctly?
 
     def process_results(self, generations, references):
