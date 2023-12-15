@@ -130,7 +130,7 @@ class FunctionGeneration(Task): #task2
         super().__init__(
             # TODO: Specify the list of stop words in `stop_words` for the code generation task \
             # and if the evaluation requires executing the generated code in `requires_execution`.
-            stop_words=["\nfloat ", "\nvec", "\nint"], #new function starts... so all the keywords
+            stop_words=["\nfloat ", "\nvec", "\nint", "\nvoid", "\nmat"], #new function starts... so all the keywords
             requires_execution=True, #we run shadercode - could that be harmful? (all in the metric)
         )
 
